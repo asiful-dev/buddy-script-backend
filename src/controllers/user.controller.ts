@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { AuthenticatedRequest } from "../types/request";
+import { AuthenticatedRequest } from "../types";
 import { AsyncHandler } from "../utils/AsyncHandler";
 import { AppResponse } from "../utils/AppResponse";
 import { AppError } from "../utils/AppError";
