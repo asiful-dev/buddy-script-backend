@@ -7,7 +7,7 @@ import {
     Response,
     NextFunction
 } from "express";
-import { AuthenticatedRequest } from "../types/request";
+import { AuthenticatedRequest } from "../types";
 
 export const verifyJWT = AsyncHandler(async (req: AuthenticatedRequest, _: Response, next: NextFunction) => {
     try {
