@@ -4,6 +4,10 @@ import { Document, Types } from "mongoose"
 type Visibility = 'public' | 'private';
 type ObjectId = Types.ObjectId;
 type TargetType = 'post' | 'comment';
+type imageUpload = {
+    url: string | "";
+    publicId: string | "";
+}
 
 
 export interface UserSchema extends Document {
@@ -24,8 +28,10 @@ export interface UserSchema extends Document {
 export interface PostSchema extends Document {
     author: ObjectId;
     content: string;
-    image?: string | null;
+    image?: imageUpload | null;
     visibility: Visibility;
+    createdAt: Date;
+    updatedAt: Date;
 
 }
 
@@ -34,10 +40,14 @@ export interface CommentSchema extends Document {
     author: ObjectId;
     content: string;
     parentComment?: ObjectId | null;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface LikeSchema extends Document {
     targetType: TargetType;
     targetId: ObjectId;
     user: ObjectId;
+    createdAt: Date;
+    updatedAt: Date;
 }
