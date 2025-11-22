@@ -12,7 +12,7 @@ import { AuthenticatedRequest } from "../types";
 export const verifyJWT = AsyncHandler(async (req: AuthenticatedRequest, _: Response, next: NextFunction) => {
     try {
         const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
-        console.log(token);
+       
 
         if (!token) {
             throw new AppError(401, "Unauthorized: No token provided", true);
