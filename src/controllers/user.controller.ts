@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from "../types/request";
 import { AsyncHandler } from "../utils/AsyncHandler";
 import { AppResponse } from "../utils/AppResponse";
 import { AppError } from "../utils/AppError";
-import User from "../models/user.models";
+import User from "../models/user.model";
 import jwt from "jsonwebtoken";
 
 // method for generating access and refresh tokens
