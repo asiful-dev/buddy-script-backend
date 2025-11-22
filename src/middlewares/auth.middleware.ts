@@ -1,6 +1,6 @@
 import { AppError } from "../utils/AppError";
 import { AsyncHandler } from "../utils/AsyncHandler";
-import User from "../models/user.models";
+import User from "../models/user.model";
 import jwt from "jsonwebtoken"
 import {
     Request,
