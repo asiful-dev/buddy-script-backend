@@ -14,3 +14,5 @@ export interface AuthenticatedRequest extends Request {
 
 export type UploadToCloudinary = (localFilePath: string) => Promise<{ url: string, publicId: string } | null>;
 
+export type DeleteFromCloudinary = (publicId: string) => Promise<boolean>;
+

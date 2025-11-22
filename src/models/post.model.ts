@@ -19,8 +19,8 @@ const postSchema = new Schema<PostSchema>({
         trim: true,
     },
     image: {
-        type: String,
-        default: null
+        url: { type: String },
+        publicId: { type: String }
     },
     visibility: {
         type: String,
