@@ -31,14 +31,14 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-
+import healthRouter from "./routes/healthcheck.route"
 import userRoutes from './routes/user.route';
-import { errorHandler } from './middlewares/error.middleware';
 
+app.use('/api', healthRouter)
 app.use('/api/users', userRoutes);
 
 
-
+import { errorHandler } from './middlewares/error.middleware';
 app.use(errorHandler);
 
 export default app;
