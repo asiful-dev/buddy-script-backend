@@ -166,7 +166,7 @@ export const updatePost = AsyncHandler(async (req: AuthenticatedRequest, res: Re
 
 });
 
-export const getSinglePost = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const getPostById = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { postId } = req.params;
     const post = await Post.findById(postId);
     if (!post) {
