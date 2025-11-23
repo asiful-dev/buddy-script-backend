@@ -189,7 +189,6 @@ export const getPostById = AsyncHandler(async (req: AuthenticatedRequest, res: R
 });
 
 export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    // Parse and validate cursor
     let cursor: Date | null = null;
     if (req.query.cursor) {
         const date = new Date(String(req.query.cursor));
@@ -199,13 +198,13 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         cursor = date;
     }
 
-    // Validate limit
+    
     const limit = Math.min(Number(req.query.limit) || 20, 50);
     if (limit < 1) {
         throw new AppError(400, "Invalid limit");
     }
 
-    // Build query
+    
     const query: any = {
         $or: [
             { visibility: Visibility.PUBLIC },
@@ -217,13 +216,13 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         query.createdAt = { $lt: cursor };
     }
 
-    // Fetch posts
+    
     const posts = await Post.find(query)
         .sort({ createdAt: -1 })
         .limit(limit + 1)
         .lean();
 
-    // Check for more posts
+    
     const hasMore = posts.length > limit;
     if (hasMore) posts.pop();
 
@@ -236,44 +235,44 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         });
     }
 
-    // Extract IDs
+    
     const postIds = posts.map(p => p._id);
     const authorIds = posts.map(p => p.author);
 
-    // Fetch related data in parallel
+    
     const [authors, likeCounts, userLikes, commentCounts] = await Promise.all([
-        // Authors
+        
         User.find({ _id: { $in: authorIds } })
-            .select("firstName lastName avatar email")
+            .select("firstName lastName email")
             .lean(),
 
-        // Like counts
+        
         Like.aggregate([
             { $match: { targetType: "post", targetId: { $in: postIds } } },
             { $group: { _id: "$targetId", count: { $sum: 1 } } }
         ]),
 
-        // User's likes
+        
         Like.find({
             targetType: "post",
             targetId: { $in: postIds },
             userId: req.user!._id
         }).lean(),
 
-        // Comment counts
+        
         Comment.aggregate([
             { $match: { postId: { $in: postIds } } },
             { $group: { _id: "$postId", count: { $sum: 1 } } }
         ])
     ]);
 
-    // Create lookup maps
+    
     const authorMap = new Map(authors.map(a => [String(a._id), a]));
     const likeCountMap = new Map(likeCounts.map(lc => [String(lc._id), lc.count]));
     const userLikedSet = new Set(userLikes.map(l => String(l.targetId)));
     const commentCountMap = new Map(commentCounts.map(cc => [String(cc._id), cc.count]));
 
-    // Merge data
+    
     const feed = posts.map(post => ({
         ...post,
         author: authorMap.get(String(post.author)) || null,
@@ -282,7 +281,7 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         commentCount: commentCountMap.get(String(post._id)) || 0
     }));
 
-    // Calculate next cursor
+    
     const nextCursor = hasMore && feed.length > 0
         ? feed[feed.length - 1].createdAt.toISOString()
         : null;
