@@ -34,11 +34,14 @@ app.use(limiter);
 import healthRouter from "./routes/healthcheck.route"
 import userRoutes from './routes/user.route';
 import postRoutes from './routes/post.route';
-
+import likeRoutes from './routes/like.route';
+import commentRoutes from './routes/comment.route';
 
 app.use('/api', healthRouter)
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/likes', likeRoutes)
+app.use('/api/comments', commentRoutes);
 
 
 import { errorHandler } from './middlewares/error.middleware';
