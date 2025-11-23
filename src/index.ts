@@ -4,7 +4,7 @@ import connectDB from "./db";
 
 const PORT = process.env.PORT || 8080;
 
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
     res.send('Buddy Script API is running');
 });
 
