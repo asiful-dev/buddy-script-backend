@@ -13,6 +13,10 @@ const router = Router();
 router.use(verifyJWT);
 
 router
+    .route("/feed")
+    .get(getFeed);
+
+router
     .route("/")
     .post(
         upload.single("image"),
@@ -27,9 +31,5 @@ router
         updatePost
     )
     .delete(deletePost);
-
-router
-    .route("/feed")
-    .get(getFeed);
 
 export default router;
