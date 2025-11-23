@@ -11,7 +11,5 @@
       "src": "/(.*)",
       "dest": "dist/index.js"
     }
-  ],
-  "installCommand": "npm install && npm run build",
-  "buildCommand": "npm run build"
-}
+  ]
+} 
