@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../types";
 import { AsyncHandler } from "../utils/AsyncHandler";
-import { AppError} from "../utils/AppError";
+import { AppError } from "../utils/AppError";
 import { AppResponse } from "../utils/AppResponse";
 import Comment from "../models/comment.model";
 import Post from "../models/post.model";
@@ -106,8 +106,8 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
     }
 
     const query: any = {
-        postId,
-        parentCommentId: null
+        post: postId,
+        parentComment: null
     };
 
     if (cursor) {
@@ -161,18 +161,25 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
         userHasLiked: userLikedSet.has(String(c._id)),
         replyCount: replyCountMap.get(String(c._id)) || 0
     }));
+    
 
     const nextCursor =
         merged.length > 0
             ? merged[merged.length - 1].createdAt.toISOString()
             : null;
 
-    return res.status(200).json(
-        new AppResponse(200, "Comments fetched", {
-            comments: merged,
-            nextCursor
-        })
-    );
+    return res
+        .status(200)
+        .json(
+            new AppResponse(
+                200,
+                "Comments fetched",
+                {
+                    comments: merged,
+                    nextCursor
+                }
+            )
+        );
 });
 
 
@@ -186,7 +193,7 @@ export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Re
     const parent = await Comment.findById(commentId).lean();
     if (!parent) throw new AppError(404, "Comment not found");
 
-    const post = await Post.findById(parent.post).lean();   
+    const post = await Post.findById(parent.post).lean();
     if (!post) throw new AppError(404, "Post not found");
 
     if (post.visibility === "private" && post.author.toString() !== userId) {
@@ -194,7 +201,7 @@ export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Re
     }
 
     const replies = await Comment.find({
-        parentCommentId: commentId
+        parentComment: commentId
     })
         .sort({ createdAt: 1 })
         .lean();

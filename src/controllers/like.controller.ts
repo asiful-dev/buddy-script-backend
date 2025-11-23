@@ -7,7 +7,7 @@ import Like from "../models/like.model";
 import Post from "../models/post.model";
 import Comment from "../models/comment.model";
 import { likeTargetType } from "../constants";
-
+import { Types } from "mongoose";
 
 
 const validateTarget = async (targetType: string, targetId: string, userId: string) => {
@@ -44,6 +44,7 @@ export const likeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: Re
     const userId = req.user!._id.toString();
     const { targetType, targetId } = req.body;
 
+
     await validateTarget(targetType, targetId, userId);
 
     const exists = await Like.findOne({
@@ -79,13 +80,15 @@ export const unlikeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: 
     const userId = req.user!._id.toString();
     const { targetType, targetId } = req.body;
 
+
     await validateTarget(targetType, targetId, userId);
 
     const result = await Like.findOneAndDelete({
         targetType,
-        targetId,
-        userId
+        targetId: new Types.ObjectId(targetId),
+        user: new Types.ObjectId(userId)
     });
+    
 
     if (!result) {
         throw new AppError(400, "You haven't liked this target");
