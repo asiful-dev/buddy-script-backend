@@ -42,12 +42,24 @@ export const registerUser = AsyncHandler(async (req: Request, res: Response) => 
     if (existingUser) {
         throw new AppError(409, "User with this email already exists");
     }
+    const imageLocalPath = req.file ? req.file.path : undefined;
+    let userAvatar;
+    if (imageLocalPath) {
+        userAvatar = await uploadToCloudinary(imageLocalPath);
+        if (!userAvatar?.url) {
+            throw new AppError(500, "Failed to upload image on cloudinary!");
+        }
+    }
 
     const user = await User.create({
         firstName,
         lastName,
         email,
-        password
+        password,
+        avatar: {
+            url: userAvatar?.url || "",
+            publicId: userAvatar?.publicId || ""
+        }
     });
 
     const { accessToken, refreshToken } = await generateTokens(user._id.toString());
