@@ -13,21 +13,28 @@ import Comment from "../models/comment.model";
 export const createPost = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { content, visibility } = req.body;
     const userId = req.user?._id;
+
     if (!userId) {
         throw new AppError(401, "Unauthorized! Please log in.");
     }
+
     if (!content || content.trim() === "") {
         throw new AppError(400, "Post content cannot be empty");
     }
+
     if (visibility && !Object.values(Visibility).includes(visibility)) {
         throw new AppError(400, "Invalid visibility value");
     }
-    const imageLocalPath = req.file ? req.file.path : undefined;
+
     let postImage;
-    if (imageLocalPath) {
-        postImage = await uploadToCloudinary(imageLocalPath);
+
+    // With memory storage, file is in req.file.buffer (not req.file.path)
+    if (req.file && req.file.buffer) {
+        // Pass buffer and originalname to uploadToCloudinary
+        postImage = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+        
         if (!postImage?.url) {
-            throw new AppError(500, "Failed to upload image on cloudinary!");
+            throw new AppError(500, "Failed to upload image to Cloudinary!");
         }
     }
 
@@ -37,25 +44,18 @@ export const createPost = AsyncHandler(async (req: AuthenticatedRequest, res: Re
         visibility: visibility || Visibility.PUBLIC,
         image: {
             url: postImage?.url || "",
-            publicId: postImage?.publicId || ""
-        }
-    })
+            publicId: postImage?.publicId || "",
+        },
+    });
 
     if (!post) {
         throw new AppError(500, "Failed to create post");
     }
 
-    return res
-        .status(200)
-        .json(
-            new AppResponse(
-                200,
-                "Post created successfully",
-                post
-            )
-        )
-
-});
+    return res.status(200).json(
+        new AppResponse(200, "Post created successfully", post)
+    );
+}); 
 
 export const deletePost = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { postId } = req.params;
@@ -117,17 +117,17 @@ export const updatePost = AsyncHandler(async (req: AuthenticatedRequest, res: Re
         throw new AppError(403, "You are not authorized to update this post");
     }
 
-    const imageLocalPath = req.file ? req.file.path : undefined;
+    const imageBuffer = req?.file?.buffer || undefined;
     let updatedPostImage = post.image;
-    if (imageLocalPath) {
+    if (imageBuffer) {
         if (post.image?.publicId) {
             const deletionResult = await deleteFromCloudinary(post.image.publicId);
             if (!deletionResult) {
                 throw new AppError(500, "Failed to delete old image from cloudinary");
             }
         }
-        const newImage = await uploadToCloudinary(imageLocalPath);
-        if (!newImage?.url) {
+        const newImage = await uploadToCloudinary(imageBuffer, req?.file?.originalname || "");
+        if (!newImage?.url || !newImage?.publicId) {
             throw new AppError(500, "Failed to upload new image to cloudinary");
         }
         updatedPostImage = newImage;

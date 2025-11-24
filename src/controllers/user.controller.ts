@@ -42,11 +42,11 @@ export const registerUser = AsyncHandler(async (req: Request, res: Response) => 
     if (existingUser) {
         throw new AppError(409, "User with this email already exists");
     }
-    const imageLocalPath = req.file ? req.file.path : undefined;
+    const imageBuffer = req?.file?.buffer || undefined;
     let userAvatar;
-    if (imageLocalPath) {
-        userAvatar = await uploadToCloudinary(imageLocalPath);
-        if (!userAvatar?.url) {
+    if (imageBuffer) {
+        userAvatar = await uploadToCloudinary(imageBuffer, req?.file?.originalname || "");
+        if (!userAvatar?.url || !userAvatar?.publicId) {
             throw new AppError(500, "Failed to upload image on cloudinary!");
         }
     }
@@ -250,17 +250,17 @@ export const updateUser = AsyncHandler(async (req: AuthenticatedRequest, res: Re
     if(![firstName, lastName, email, password].some((field) => field?.trim() === "")) {
          throw new AppError(400, "All fields are required");
     }
-    const imageLocalPath = req.file ? req.file.path : undefined;
+        const imageBuffer = req?.file?.buffer || undefined;
     let userAvatar = user?.avatar;
-    if (imageLocalPath) {
+    if (imageBuffer) {
         if (user?.avatar?.publicId) {
             const deletionResult = await deleteFromCloudinary(user?.avatar?.publicId);
             if (!deletionResult) {
                 throw new AppError(500, "Failed to delete old image from cloudinary");
             }
         }
-        const newImage = await uploadToCloudinary(imageLocalPath);
-        if (!newImage?.url) {
+        const newImage = await uploadToCloudinary(imageBuffer, req?.file?.originalname || "");
+        if (!newImage?.url || !newImage?.publicId) {
             throw new AppError(500, "Failed to upload new image to cloudinary");
         }
         userAvatar = newImage;
