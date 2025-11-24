@@ -15,7 +15,7 @@ export interface UserSchema extends Document {
     lastName: string;
     email: string;
     password: string;
-    avatar?: string;
+    avatar?: imageUpload;
     refreshToken?: string;
 
 

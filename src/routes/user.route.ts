@@ -4,7 +4,8 @@ import {
     loginUser,
     logoutUser,
     refreshAccessToken,
-    getCurrentUser
+    getCurrentUser,
+    updateUser
 } from "../controllers/user.controller"
 import { verifyJWT } from "../middlewares/auth.middleware";
 
@@ -30,6 +31,10 @@ router
 router
     .route("/me")
     .get(verifyJWT, getCurrentUser);
+
+router
+    .route("/update")
+    .patch(verifyJWT, updateUser);
 
 
 export default router;

@@ -5,6 +5,7 @@ import { AppResponse } from "../utils/AppResponse";
 import { AppError } from "../utils/AppError";
 import User from "../models/user.model";
 import jwt from "jsonwebtoken";
+import { deleteFromCloudinary, uploadToCloudinary } from "../utils/Cloudinary";
 
 // method for generating access and refresh tokens
 const generateTokens = async (userId: string) => {
@@ -223,6 +224,60 @@ export const refreshAccessToken = AsyncHandler(async (req: Request, res: Respons
                     accessToken,
                     refreshToken
                 }
+            )
+        );
+});
+
+export const updateUser = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { firstName, lastName, email, password } = req.body;
+    const userId = req.user?._id;
+    if (!userId) {
+        throw new AppError(401, "Unauthorized! Please log in.");
+    }
+    const user = await User.findById(userId);
+    if(![firstName, lastName, email, password].some((field) => field?.trim() === "")) {
+        throw new AppError(400, "All fields are required");
+    }
+    const imageLocalPath = req.file ? req.file.path : undefined;
+    let userAvatar = user?.avatar;
+    if (imageLocalPath) {
+        if (user?.avatar?.publicId) {
+            const deletionResult = await deleteFromCloudinary(user?.avatar?.publicId);
+            if (!deletionResult) {
+                throw new AppError(500, "Failed to delete old image from cloudinary");
+            }
+        }
+        const newImage = await uploadToCloudinary(imageLocalPath);
+        if (!newImage?.url) {
+            throw new AppError(500, "Failed to upload new image to cloudinary");
+        }
+        userAvatar = newImage;
+    }
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        {
+            $set: {
+                firstName,
+                lastName,
+                email,
+                avatar: {
+                    url: userAvatar?.url || "",
+                    publicId: userAvatar?.publicId || ""
+                }
+            }
+        },
+        { new: true }
+    )
+    if (!updatedUser) {
+        throw new AppError(500, "Failed to update user");
+    }
+    return res
+        .status(200)
+        .json(
+            new AppResponse(
+                200,
+                "User updated successfully",
+                updatedUser
             )
         );
 });
