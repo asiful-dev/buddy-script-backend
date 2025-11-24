@@ -3,7 +3,8 @@ import {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    getCurrentUser
 } from "../controllers/user.controller"
 import { verifyJWT } from "../middlewares/auth.middleware";
 
@@ -25,6 +26,10 @@ router
 router
     .route("/refresh-token")
     .post(refreshAccessToken);
+
+router
+    .route("/me")
+    .get(verifyJWT, getCurrentUser);
 
 
 export default router;

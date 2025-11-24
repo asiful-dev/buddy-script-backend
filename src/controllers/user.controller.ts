@@ -49,18 +49,32 @@ export const registerUser = AsyncHandler(async (req: Request, res: Response) => 
         password
     });
 
+    const { accessToken, refreshToken } = await generateTokens(user._id.toString());
+
     const createdUser = await User.findById(user._id).select("-password -refreshToken");
 
     if (!createdUser) {
         throw new AppError(500, "Failed to create user");
     }
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
     return res
         .status(201)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
         .json(
             new AppResponse(
                 201,
                 "User registered successfully",
-                createdUser
+                {
+                    user: createdUser,
+                    accessToken,
+                    refreshToken
+                }
             )
         )
 });
@@ -108,6 +122,20 @@ export const loginUser = AsyncHandler(async (req: Request, res: Response) => {
             )
         );
 
+});
+
+export const getCurrentUser = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    return res
+        .status(200)
+        .json(
+            new AppResponse(
+                200,
+                "Current user fetched successfully",
+                {
+                    user: req.user
+                }
+            )
+        );
 });
 
 export const logoutUser = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
