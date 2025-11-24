@@ -8,6 +8,7 @@ import {
     updateUser
 } from "../controllers/user.controller"
 import { verifyJWT } from "../middlewares/auth.middleware";
+import { upload } from "../middlewares/multer.middleware";
 
 
 const router = Router();
@@ -34,7 +35,12 @@ router
 
 router
     .route("/update")
-    .patch(verifyJWT, updateUser);
+    .patch(
+        verifyJWT,
+        upload.single("avatar"),
+        updateUser
+    );
+
 
 
 export default router;

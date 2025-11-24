@@ -248,7 +248,7 @@ export const updateUser = AsyncHandler(async (req: AuthenticatedRequest, res: Re
     }
     const user = await User.findById(userId);
     if(![firstName, lastName, email, password].some((field) => field?.trim() === "")) {
-        throw new AppError(400, "All fields are required");
+         throw new AppError(400, "All fields are required");
     }
     const imageLocalPath = req.file ? req.file.path : undefined;
     let userAvatar = user?.avatar;
