@@ -10,7 +10,7 @@ import { deleteFromCloudinary, uploadToCloudinary } from "../utils/Cloudinary";
 // method for generating access and refresh tokens
 const generateTokens = async (userId: string) => {
     const user = await User.findById(userId)
-    
+
     if (!user) {
         throw new AppError(404, "User not found");
     }
@@ -247,10 +247,15 @@ export const updateUser = AsyncHandler(async (req: AuthenticatedRequest, res: Re
         throw new AppError(401, "Unauthorized! Please log in.");
     }
     const user = await User.findById(userId);
-    if(![firstName, lastName, email, password].some((field) => field?.trim() === "")) {
-         throw new AppError(400, "All fields are required");
-    }
-        const imageBuffer = req?.file?.buffer || undefined;
+    let updatedFirstName = firstName;
+    if (!firstName.trim()) updatedFirstName = user?.firstName || "";
+    let updatedLastName = lastName;
+    if (!lastName.trim()) updatedLastName = user?.lastName || "";
+    let updatedEmail = email;
+    if (!email.trim()) updatedEmail = user?.email || "";
+    let updatedPassword = password;
+    if (!password.trim()) updatedPassword = user?.password || "";
+    const imageBuffer = req?.file?.buffer || undefined;
     let userAvatar = user?.avatar;
     if (imageBuffer) {
         if (user?.avatar?.publicId) {
@@ -269,14 +274,16 @@ export const updateUser = AsyncHandler(async (req: AuthenticatedRequest, res: Re
         userId,
         {
             $set: {
-                firstName,
-                lastName,
-                email,
+                firstName: updatedFirstName,
+                lastName: updatedLastName,
+                email: updatedEmail,
+                password: updatedPassword,
                 avatar: {
                     url: userAvatar?.url || "",
                     publicId: userAvatar?.publicId || ""
                 }
             }
+
         },
         { new: true }
     )
