@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware";
 import {
-    likeTarget,
-    unlikeTarget,
-    getLikes
+    reactToTarget,
+    removeReaction,
+    getReactions
 } from "../controllers/like.controller";
 
 const router = Router();
@@ -11,12 +11,12 @@ router.use(verifyJWT);
 
 router
     .route("/")
-    .post(likeTarget)         
-    .delete(unlikeTarget)     
+    .post(reactToTarget)         
+    .delete(removeReaction);     
 
 router
     .route("/:targetType/:targetId")
-    .get(getLikes); 
+    .get(getReactions); 
 
     
 export default router;

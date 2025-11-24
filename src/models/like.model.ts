@@ -4,7 +4,7 @@ import {
     Types
 } from "mongoose";
 import { LikeSchema } from "./types";
-import { likeTargetType } from "../constants";
+import { likeTargetType, ReactionType } from "../constants";
 
 
 const likeSchema = new Schema<LikeSchema>({
@@ -24,6 +24,12 @@ const likeSchema = new Schema<LikeSchema>({
         ref: "User",
         required: true,
         index: true
+    },
+    reactionType: {
+        type: String,
+        enum: Object.values(ReactionType),
+        required: true,
+        default: ReactionType.LIKE
     }
 }, { timestamps: true });
 

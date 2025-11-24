@@ -4,7 +4,7 @@ import { AppResponse } from "../utils/AppResponse";
 import { AppError } from "../utils/AppError";
 import { AuthenticatedRequest } from "../types";
 import Post from "../models/post.model";
-import { Visibility } from "../constants";
+import { Visibility, ReactionType, likeTargetType } from "../constants";
 import { deleteFromCloudinary, uploadToCloudinary } from "../utils/Cloudinary";
 import User from "../models/user.model";
 import Like from "../models/like.model";
@@ -240,46 +240,82 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
     const authorIds = posts.map(p => p.author);
 
     
-    const [authors, likeCounts, userLikes, commentCounts] = await Promise.all([
+    const [authors, reactions, userReactions, commentCounts] = await Promise.all([
         
         User.find({ _id: { $in: authorIds } })
-            .select("firstName lastName email")
+            .select("firstName lastName email avatar")
             .lean(),
 
         
         Like.aggregate([
-            { $match: { targetType: "post", targetId: { $in: postIds } } },
-            { $group: { _id: "$targetId", count: { $sum: 1 } } }
+            { $match: { targetType: likeTargetType.POST, targetId: { $in: postIds } } },
+            { 
+                $group: { 
+                    _id: { targetId: "$targetId", reactionType: "$reactionType" },
+                    count: { $sum: 1 },
+                    userIds: { $push: "$user" }
+                } 
+            }
         ]),
 
         
         Like.find({
-            targetType: "post",
+            targetType: likeTargetType.POST,
             targetId: { $in: postIds },
-            userId: req.user!._id
+            user: req.user!._id
         }).lean(),
 
         
         Comment.aggregate([
-            { $match: { postId: { $in: postIds } } },
-            { $group: { _id: "$postId", count: { $sum: 1 } } }
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: "$post", count: { $sum: 1 } } }
         ])
     ]);
 
     
     const authorMap = new Map(authors.map(a => [String(a._id), a]));
-    const likeCountMap = new Map(likeCounts.map(lc => [String(lc._id), lc.count]));
-    const userLikedSet = new Set(userLikes.map(l => String(l.targetId)));
     const commentCountMap = new Map(commentCounts.map(cc => [String(cc._id), cc.count]));
+    
+    // Build reaction maps by post ID
+    const reactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
+    postIds.forEach(id => {
+        const postIdStr = String(id);
+        reactionMap.set(postIdStr, {});
+        Object.values(ReactionType).forEach(type => {
+            reactionMap.get(postIdStr)![type] = { count: 0, userIds: [] };
+        });
+    });
+
+    reactions.forEach(reaction => {
+        const postIdStr = String(reaction._id.targetId);
+        const reactionType = reaction._id.reactionType;
+        if (reactionMap.has(postIdStr) && reactionMap.get(postIdStr)![reactionType]) {
+            reactionMap.get(postIdStr)![reactionType].count = reaction.count;
+            reactionMap.get(postIdStr)![reactionType].userIds = reaction.userIds.map((id: any) => String(id));
+        }
+    });
+
+    // Build user reaction map
+    const userReactionMap = new Map<string, string>();
+    userReactions.forEach(reaction => {
+        userReactionMap.set(String(reaction.targetId), reaction.reactionType);
+    });
 
     
-    const feed = posts.map(post => ({
-        ...post,
-        author: authorMap.get(String(post.author)) || null,
-        likeCount: likeCountMap.get(String(post._id)) || 0,
-        userHasLiked: userLikedSet.has(String(post._id)),
-        commentCount: commentCountMap.get(String(post._id)) || 0
-    }));
+    const feed = posts.map(post => {
+        const postIdStr = String(post._id);
+        const reactions = reactionMap.get(postIdStr) || {};
+        const totalReactions = Object.values(reactions).reduce((sum, r) => sum + r.count, 0);
+        
+        return {
+            ...post,
+            author: authorMap.get(String(post.author)) || null,
+            reactions,
+            totalReactions,
+            userReaction: userReactionMap.get(postIdStr) || null,
+            commentCount: commentCountMap.get(postIdStr) || 0
+        };
+    });
 
     
     const nextCursor = hasMore && feed.length > 0

@@ -7,6 +7,7 @@ import Comment from "../models/comment.model";
 import Post from "../models/post.model";
 import Like from "../models/like.model";
 import User from "../models/user.model";
+import { ReactionType, likeTargetType } from "../constants";
 
 
 
@@ -129,38 +130,71 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
 
     const userMap = new Map(users.map(u => [String(u._id), u]));
 
-    // batch like counts
-    const likeCounts = await Like.aggregate([
-        { $match: { targetType: "comment", targetId: { $in: commentIds } } },
-        { $group: { _id: "$targetId", count: { $sum: 1 } } }
+    // batch reaction counts by type
+    const reactions = await Like.aggregate([
+        { $match: { targetType: likeTargetType.COMMENT, targetId: { $in: commentIds } } },
+        { 
+            $group: { 
+                _id: { targetId: "$targetId", reactionType: "$reactionType" },
+                count: { $sum: 1 },
+                userIds: { $push: "$user" }
+            } 
+        }
     ]);
 
-    const likeCountMap = new Map(likeCounts.map(c => [String(c._id), c.count]));
+    // Build reaction maps by comment ID
+    const reactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
+    commentIds.forEach(id => {
+        const commentIdStr = String(id);
+        reactionMap.set(commentIdStr, {});
+        Object.values(ReactionType).forEach(type => {
+            reactionMap.get(commentIdStr)![type] = { count: 0, userIds: [] };
+        });
+    });
 
-    // batch user-like states
-    const userLikes = await Like.find({
-        targetType: "comment",
+    reactions.forEach(reaction => {
+        const commentIdStr = String(reaction._id.targetId);
+        const reactionType = reaction._id.reactionType;
+        if (reactionMap.has(commentIdStr) && reactionMap.get(commentIdStr)![reactionType]) {
+            reactionMap.get(commentIdStr)![reactionType].count = reaction.count;
+            reactionMap.get(commentIdStr)![reactionType].userIds = reaction.userIds.map((id: any) => String(id));
+        }
+    });
+
+    // batch user reactions
+    const userReactions = await Like.find({
+        targetType: likeTargetType.COMMENT,
         targetId: { $in: commentIds },
-        userId
+        user: userId
     }).lean();
 
-    const userLikedSet = new Set(userLikes.map(l => String(l.targetId)));
+    const userReactionMap = new Map<string, string>();
+    userReactions.forEach(reaction => {
+        userReactionMap.set(String(reaction.targetId), reaction.reactionType);
+    });
 
     // batch reply counts
     const replyCounts = await Comment.aggregate([
-        { $match: { parentCommentId: { $in: commentIds } } },
-        { $group: { _id: "$parentCommentId", count: { $sum: 1 } } }
+        { $match: { parentComment: { $in: commentIds } } },
+        { $group: { _id: "$parentComment", count: { $sum: 1 } } }
     ]);
 
     const replyCountMap = new Map(replyCounts.map(r => [String(r._id), r.count]));
 
-    const merged = comments.map(c => ({
-        ...c,
-        author: userMap.get(String(c.author)) || null,
-        likeCount: likeCountMap.get(String(c._id)) || 0,
-        userHasLiked: userLikedSet.has(String(c._id)),
-        replyCount: replyCountMap.get(String(c._id)) || 0
-    }));
+    const merged = comments.map(c => {
+        const commentIdStr = String(c._id);
+        const reactions = reactionMap.get(commentIdStr) || {};
+        const totalReactions = Object.values(reactions).reduce((sum, r) => sum + r.count, 0);
+        
+        return {
+            ...c,
+            author: userMap.get(String(c.author)) || null,
+            reactions,
+            totalReactions,
+            userReaction: userReactionMap.get(commentIdStr) || null,
+            replyCount: replyCountMap.get(commentIdStr) || 0
+        };
+    });
     
 
     const nextCursor =
@@ -215,27 +249,61 @@ export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Re
 
     const userMap = new Map(users.map(u => [String(u._id), u]));
 
-    const likeCounts = await Like.aggregate([
-        { $match: { targetType: "comment", targetId: { $in: replyIds } } },
-        { $group: { _id: "$targetId", count: { $sum: 1 } } }
+    // batch reaction counts by type for replies
+    const replyReactions = await Like.aggregate([
+        { $match: { targetType: likeTargetType.COMMENT, targetId: { $in: replyIds } } },
+        { 
+            $group: { 
+                _id: { targetId: "$targetId", reactionType: "$reactionType" },
+                count: { $sum: 1 },
+                userIds: { $push: "$user" }
+            } 
+        }
     ]);
 
-    const likeCountMap = new Map(likeCounts.map(l => [String(l._id), l.count]));
+    // Build reaction maps by reply ID
+    const replyReactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
+    replyIds.forEach(id => {
+        const replyIdStr = String(id);
+        replyReactionMap.set(replyIdStr, {});
+        Object.values(ReactionType).forEach(type => {
+            replyReactionMap.get(replyIdStr)![type] = { count: 0, userIds: [] };
+        });
+    });
 
-    const userLikes = await Like.find({
-        targetType: "comment",
+    replyReactions.forEach(reaction => {
+        const replyIdStr = String(reaction._id.targetId);
+        const reactionType = reaction._id.reactionType;
+        if (replyReactionMap.has(replyIdStr) && replyReactionMap.get(replyIdStr)![reactionType]) {
+            replyReactionMap.get(replyIdStr)![reactionType].count = reaction.count;
+            replyReactionMap.get(replyIdStr)![reactionType].userIds = reaction.userIds.map((id: any) => String(id));
+        }
+    });
+
+    const userReplyReactions = await Like.find({
+        targetType: likeTargetType.COMMENT,
         targetId: { $in: replyIds },
-        userId
+        user: userId
     }).lean();
 
-    const userLikedSet = new Set(userLikes.map(l => String(l.targetId)));
+    const userReplyReactionMap = new Map<string, string>();
+    userReplyReactions.forEach(reaction => {
+        userReplyReactionMap.set(String(reaction.targetId), reaction.reactionType);
+    });
 
-    const merged = replies.map(r => ({
-        ...r,
-        author: userMap.get(String(r.author)) || null,
-        likeCount: likeCountMap.get(String(r._id)) || 0,
-        userHasLiked: userLikedSet.has(String(r._id))
-    }));
+    const merged = replies.map(r => {
+        const replyIdStr = String(r._id);
+        const reactions = replyReactionMap.get(replyIdStr) || {};
+        const totalReactions = Object.values(reactions).reduce((sum, r) => sum + r.count, 0);
+        
+        return {
+            ...r,
+            author: userMap.get(String(r.author)) || null,
+            reactions,
+            totalReactions,
+            userReaction: userReplyReactionMap.get(replyIdStr) || null
+        };
+    });
 
     return res.status(200).json(
         new AppResponse(200, "Replies fetched", merged)

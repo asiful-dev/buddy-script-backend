@@ -4,6 +4,7 @@ import { Document, Types } from "mongoose"
 type Visibility = 'public' | 'private';
 type ObjectId = Types.ObjectId;
 type TargetType = 'post' | 'comment';
+type ReactionType = 'like' | 'love' | 'haha' | 'care' | 'angry';
 type imageUpload = {
     url: string | "";
     publicId: string | "";
@@ -48,6 +49,7 @@ export interface LikeSchema extends Document {
     targetType: TargetType;
     targetId: ObjectId;
     user: ObjectId;
+    reactionType: ReactionType;
     createdAt: Date;
     updatedAt: Date;
 }

@@ -6,7 +6,7 @@ import { AppResponse } from "../utils/AppResponse";
 import Like from "../models/like.model";
 import Post from "../models/post.model";
 import Comment from "../models/comment.model";
-import { likeTargetType } from "../constants";
+import { likeTargetType, ReactionType } from "../constants";
 import { Types } from "mongoose";
 
 
@@ -40,34 +40,61 @@ const validateTarget = async (targetType: string, targetId: string, userId: stri
 
 
 
-export const likeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const reactToTarget = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
-    const { targetType, targetId } = req.body;
+    const { targetType, targetId, reactionType } = req.body;
 
+    if (!reactionType || !Object.values(ReactionType).includes(reactionType)) {
+        throw new AppError(400, "Valid reactionType is required (like, love, haha, care, angry)");
+    }
 
     await validateTarget(targetType, targetId, userId);
 
-    const exists = await Like.findOne({
+    // Check if user already reacted
+    const existingReaction = await Like.findOne({
         targetType,
-        targetId,
-        user: userId
+        targetId: new Types.ObjectId(targetId),
+        user: new Types.ObjectId(userId)
     });
 
-    if (exists) {
-        throw new AppError(400, "Already liked");
+    if (existingReaction) {
+        // If same reaction type, remove it (toggle off)
+        if (existingReaction.reactionType === reactionType) {
+            await Like.findByIdAndDelete(existingReaction._id);
+            return res.status(200).json(
+                new AppResponse(
+                    200,
+                    "Reaction removed successfully",
+                    null
+                )
+            );
+        } else {
+            // Update to new reaction type
+            existingReaction.reactionType = reactionType as ReactionType;
+            await existingReaction.save();
+            return res.status(200).json(
+                new AppResponse(
+                    200,
+                    "Reaction updated successfully",
+                    existingReaction
+                )
+            );
+        }
     }
 
-    const like = await Like.create({
+    // Create new reaction
+    const reaction = await Like.create({
         targetType,
-        targetId,
-        user: userId
+        targetId: new Types.ObjectId(targetId),
+        user: new Types.ObjectId(userId),
+        reactionType: reactionType as ReactionType
     });
 
     return res.status(201).json(
         new AppResponse(
             201,
-            "Liked successfully",
-            like
+            "Reaction added successfully",
+            reaction
         )
     );
 });
@@ -76,10 +103,9 @@ export const likeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: Re
 
 
 
-export const unlikeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const removeReaction = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
     const { targetType, targetId } = req.body;
-
 
     await validateTarget(targetType, targetId, userId);
 
@@ -91,13 +117,13 @@ export const unlikeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: 
     
 
     if (!result) {
-        throw new AppError(400, "You haven't liked this target");
+        throw new AppError(400, "You haven't reacted to this target");
     }
 
     return res.status(200).json(
         new AppResponse(
             200,
-            "Unliked successfully",
+            "Reaction removed successfully",
             null
         )
     );
@@ -107,7 +133,7 @@ export const unlikeTarget = AsyncHandler(async (req: AuthenticatedRequest, res: 
 
 
 
-export const getLikes = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const getReactions = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { targetType, targetId } = req.params;
 
     if (!targetType || !targetId) {
@@ -118,7 +144,6 @@ export const getLikes = AsyncHandler(async (req: AuthenticatedRequest, res: Resp
         throw new AppError(400, "Invalid targetType");
     }
 
-
     if (targetType === likeTargetType.POST) {
         const post = await Post.findById(targetId).lean();
         if (!post) throw new AppError(404, "Post not found");
@@ -127,21 +152,42 @@ export const getLikes = AsyncHandler(async (req: AuthenticatedRequest, res: Resp
         if (!comment) throw new AppError(404, "Comment not found");
     }
 
-    const likes = await Like.find({
+    // Get all reactions grouped by type
+    const reactions = await Like.find({
         targetType,
-        targetId
+        targetId: new Types.ObjectId(targetId)
     }).lean();
 
-    const likeCount = likes.length;
-    const userIds = likes.map(l => l.user);
+    // Group reactions by type and collect user IDs
+    const reactionBreakdown: Record<string, { count: number; userIds: string[] }> = {};
+    
+    // Initialize all reaction types
+    Object.values(ReactionType).forEach(type => {
+        reactionBreakdown[type] = { count: 0, userIds: [] };
+    });
+
+    reactions.forEach(reaction => {
+        const type = reaction.reactionType;
+        if (reactionBreakdown[type]) {
+            reactionBreakdown[type].count++;
+            reactionBreakdown[type].userIds.push(reaction.user.toString());
+        }
+    });
+
+    // Calculate total reaction count
+    const totalReactions = reactions.length;
+
+    // Get current user's reaction if exists
+    const userReaction = reactions.find(r => r.user.toString() === req.user!._id.toString());
 
     return res.status(200).json(
         new AppResponse(
             200,
-            "Like info fetched",
+            "Reactions fetched successfully",
             {
-                likeCount,
-                userIds
+                totalReactions,
+                userReaction: userReaction ? userReaction.reactionType : null,
+                reactions: reactionBreakdown
             }
         )
     );
