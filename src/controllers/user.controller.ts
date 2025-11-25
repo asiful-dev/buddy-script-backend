@@ -7,7 +7,6 @@ import User from "../models/user.model";
 import jwt from "jsonwebtoken";
 import { deleteFromCloudinary, uploadToCloudinary } from "../utils/Cloudinary";
 
-// method for generating access and refresh tokens
 const generateTokens = async (userId: string) => {
     const user = await User.findById(userId)
 
@@ -187,7 +186,6 @@ export const refreshAccessToken = AsyncHandler(async (req: Request, res: Respons
         throw new AppError(401, "Refresh token is required. Please log in again.");
     }
 
-    // Verify JWT token - this will throw an error if invalid/expired
     let decodedRefreshToken;
     try {
         decodedRefreshToken = jwt.verify(

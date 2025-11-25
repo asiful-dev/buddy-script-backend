@@ -28,9 +28,7 @@ export const createPost = AsyncHandler(async (req: AuthenticatedRequest, res: Re
 
     let postImage;
 
-    // With memory storage, file is in req.file.buffer (not req.file.path)
     if (req.file && req.file.buffer) {
-        // Pass buffer and originalname to uploadToCloudinary
         postImage = await uploadToCloudinary(req.file.buffer, req.file.originalname);
         
         if (!postImage?.url) {
@@ -204,7 +202,6 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         throw new AppError(400, "Invalid limit");
     }
 
-    
     const query: any = {
         $or: [
             { visibility: Visibility.PUBLIC },
@@ -216,13 +213,11 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         query.createdAt = { $lt: cursor };
     }
 
-    
     const posts = await Post.find(query)
         .sort({ createdAt: -1 })
         .limit(limit + 1)
         .lean();
 
-    
     const hasMore = posts.length > limit;
     if (hasMore) posts.pop();
 
@@ -235,18 +230,14 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         });
     }
 
-    
     const postIds = posts.map(p => p._id);
     const authorIds = posts.map(p => p.author);
 
-    
     const [authors, reactions, userReactions, commentCounts] = await Promise.all([
-        
         User.find({ _id: { $in: authorIds } })
             .select("firstName lastName email avatar")
             .lean(),
 
-        
         Like.aggregate([
             { $match: { targetType: likeTargetType.POST, targetId: { $in: postIds } } },
             { 
@@ -258,25 +249,21 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
             }
         ]),
 
-        
         Like.find({
             targetType: likeTargetType.POST,
             targetId: { $in: postIds },
             user: req.user!._id
         }).lean(),
 
-        
         Comment.aggregate([
             { $match: { post: { $in: postIds } } },
             { $group: { _id: "$post", count: { $sum: 1 } } }
         ])
     ]);
 
-    
     const authorMap = new Map(authors.map(a => [String(a._id), a]));
     const commentCountMap = new Map(commentCounts.map(cc => [String(cc._id), cc.count]));
     
-    // Build reaction maps by post ID
     const reactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
     postIds.forEach(id => {
         const postIdStr = String(id);
@@ -295,13 +282,11 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         }
     });
 
-    // Build user reaction map
     const userReactionMap = new Map<string, string>();
     userReactions.forEach(reaction => {
         userReactionMap.set(String(reaction.targetId), reaction.reactionType);
     });
 
-    
     const feed = posts.map(post => {
         const postIdStr = String(post._id);
         const reactions = reactionMap.get(postIdStr) || {};
@@ -317,7 +302,6 @@ export const getFeed = AsyncHandler(async (req: AuthenticatedRequest, res: Respo
         };
     });
 
-    
     const nextCursor = hasMore && feed.length > 0
         ? feed[feed.length - 1].createdAt.toISOString()
         : null;

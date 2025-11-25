@@ -9,9 +9,6 @@ import Like from "../models/like.model";
 import User from "../models/user.model";
 import { ReactionType, likeTargetType } from "../constants";
 
-
-
-// Create root comment on a post
 export const createComment = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
     const { postId } = req.params;
@@ -42,9 +39,6 @@ export const createComment = AsyncHandler(async (req: AuthenticatedRequest, res:
     );
 });
 
-
-
-// Create reply to a comment
 export const createReply = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
     const { commentId } = req.params;
@@ -80,10 +74,6 @@ export const createReply = AsyncHandler(async (req: AuthenticatedRequest, res: R
     );
 });
 
-
-
-
-// FETCH ROOT COMMENTS — paginated (no N+1)
 export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
     const { postId } = req.params;
@@ -123,14 +113,12 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
     const commentIds = comments.map(c => c._id);
     const authorIds = comments.map(c => c.author);
 
-    // batch users
     const users = await User.find({
         _id: { $in: authorIds }
     }).select("firstName lastName avatar").lean();
 
     const userMap = new Map(users.map(u => [String(u._id), u]));
 
-    // batch reaction counts by type
     const reactions = await Like.aggregate([
         { $match: { targetType: likeTargetType.COMMENT, targetId: { $in: commentIds } } },
         { 
@@ -142,7 +130,6 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
         }
     ]);
 
-    // Build reaction maps by comment ID
     const reactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
     commentIds.forEach(id => {
         const commentIdStr = String(id);
@@ -161,7 +148,6 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
         }
     });
 
-    // batch user reactions
     const userReactions = await Like.find({
         targetType: likeTargetType.COMMENT,
         targetId: { $in: commentIds },
@@ -173,7 +159,6 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
         userReactionMap.set(String(reaction.targetId), reaction.reactionType);
     });
 
-    // batch reply counts
     const replyCounts = await Comment.aggregate([
         { $match: { parentComment: { $in: commentIds } } },
         { $group: { _id: "$parentComment", count: { $sum: 1 } } }
@@ -195,7 +180,6 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
             replyCount: replyCountMap.get(commentIdStr) || 0
         };
     });
-    
 
     const nextCursor =
         merged.length > 0
@@ -216,10 +200,6 @@ export const getCommentsForPost = AsyncHandler(async (req: AuthenticatedRequest,
         );
 });
 
-
-
-
-// FETCH REPLIES FOR A COMMENT
 export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!._id.toString();
     const { commentId } = req.params;
@@ -249,7 +229,6 @@ export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Re
 
     const userMap = new Map(users.map(u => [String(u._id), u]));
 
-    // batch reaction counts by type for replies
     const replyReactions = await Like.aggregate([
         { $match: { targetType: likeTargetType.COMMENT, targetId: { $in: replyIds } } },
         { 
@@ -261,7 +240,6 @@ export const getReplies = AsyncHandler(async (req: AuthenticatedRequest, res: Re
         }
     ]);
 
-    // Build reaction maps by reply ID
     const replyReactionMap = new Map<string, Record<string, { count: number; userIds: string[] }>>();
     replyIds.forEach(id => {
         const replyIdStr = String(id);

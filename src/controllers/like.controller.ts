@@ -19,7 +19,6 @@ const validateTarget = async (targetType: string, targetId: string, userId: stri
         throw new AppError(400, "Invalid targetType");
     }
 
-
     if (targetType === likeTargetType.POST) {
         const post = await Post.findById(targetId).lean();
         if (!post) throw new AppError(404, "Post not found");
@@ -28,7 +27,6 @@ const validateTarget = async (targetType: string, targetId: string, userId: stri
             throw new AppError(403, "Unauthorized access to private post");
         }
     }
-
 
     if (targetType === likeTargetType.COMMENT) {
         const comment = await Comment.findById(targetId).lean();
@@ -50,7 +48,6 @@ export const reactToTarget = AsyncHandler(async (req: AuthenticatedRequest, res:
 
     await validateTarget(targetType, targetId, userId);
 
-    // Check if user already reacted
     const existingReaction = await Like.findOne({
         targetType,
         targetId: new Types.ObjectId(targetId),
@@ -58,7 +55,6 @@ export const reactToTarget = AsyncHandler(async (req: AuthenticatedRequest, res:
     });
 
     if (existingReaction) {
-        // If same reaction type, remove it (toggle off)
         if (existingReaction.reactionType === reactionType) {
             await Like.findByIdAndDelete(existingReaction._id);
             return res.status(200).json(
@@ -69,7 +65,6 @@ export const reactToTarget = AsyncHandler(async (req: AuthenticatedRequest, res:
                 )
             );
         } else {
-            // Update to new reaction type
             existingReaction.reactionType = reactionType as ReactionType;
             await existingReaction.save();
             return res.status(200).json(
@@ -82,7 +77,6 @@ export const reactToTarget = AsyncHandler(async (req: AuthenticatedRequest, res:
         }
     }
 
-    // Create new reaction
     const reaction = await Like.create({
         targetType,
         targetId: new Types.ObjectId(targetId),
@@ -149,19 +143,16 @@ export const getReactions = AsyncHandler(async (req: AuthenticatedRequest, res: 
         if (!post) throw new AppError(404, "Post not found");
     } else {
         const comment = await Comment.findById(targetId).lean();
-        if (!comment) throw new AppError(404, "Comment not found");
+        if (!comment)         throw new AppError(404, "Comment not found");
     }
 
-    // Get all reactions grouped by type
     const reactions = await Like.find({
         targetType,
         targetId: new Types.ObjectId(targetId)
     }).lean();
 
-    // Group reactions by type and collect user IDs
     const reactionBreakdown: Record<string, { count: number; userIds: string[] }> = {};
     
-    // Initialize all reaction types
     Object.values(ReactionType).forEach(type => {
         reactionBreakdown[type] = { count: 0, userIds: [] };
     });
@@ -174,10 +165,8 @@ export const getReactions = AsyncHandler(async (req: AuthenticatedRequest, res: 
         }
     });
 
-    // Calculate total reaction count
     const totalReactions = reactions.length;
 
-    // Get current user's reaction if exists
     const userReaction = reactions.find(r => r.user.toString() === req.user!._id.toString());
 
     return res.status(200).json(

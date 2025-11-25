@@ -36,12 +36,14 @@ import userRoutes from './routes/user.route';
 import postRoutes from './routes/post.route';
 import likeRoutes from './routes/like.route';
 import commentRoutes from './routes/comment.route';
+import swaggerRouter from './routes/swagger.route';
 
 app.use('/api', healthRouter)
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/likes', likeRoutes)
 app.use('/api/comments', commentRoutes);
+app.use('/api-docs', swaggerRouter);
 
 
 import { errorHandler } from './middlewares/error.middleware';
